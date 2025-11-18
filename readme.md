@@ -64,7 +64,7 @@ Quick info:
 ### Automatic installer
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/right9code/dotfiles/master/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/right9code/dotfiles/main/setup.sh | bash
 ```
 
 **⚠️ Important Notes:**
