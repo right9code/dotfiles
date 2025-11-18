@@ -9,13 +9,7 @@ DOTFILES_DIR="$HOME/.local/share/dotfiles"
 # Set initial theme
 log_info "Setting up initial theme (everforest)..."
 mkdir -p "$DOTFILES_DIR/current"
-THEME_LINK="$DOTFILES_DIR/current/theme"
-if [[ -d "$THEME_LINK" && ! -L "$THEME_LINK" ]]; then
-    # Remove directory if it exists and is not a symlink
-    log_info "Removing existing theme directory at $THEME_LINK"
-    rm -rf "$THEME_LINK"
-fi
-ln -snf "$DOTFILES_DIR/themes/everforest" "$THEME_LINK"
+ln -snf "$DOTFILES_DIR/themes/everforest" "$DOTFILES_DIR/current/theme"
 ln -snf "$DOTFILES_DIR/current/theme/backgrounds/1-everforest.jpg" "$DOTFILES_DIR/current/background"
 
 mkdir -p "$HOME/.config/nvim/lua/plugins"
