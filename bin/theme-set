@@ -150,6 +150,33 @@ switch_theme() {
     if is_dynamic_theme "$theme_name"; then
         log_step "Generating colors (dynamic theme)"
         generate_colors_from_wallpaper "$wallpaper"
+    else
+        log_step "Applying static theme settings"
+        
+        # Apply Kvantum theme
+        if [[ -f "$theme_path/kvantum.kvconfig" ]]; then
+            mkdir -p "$HOME/.config/Kvantum/$theme_name"
+            cp "$theme_path/kvantum.kvconfig" "$HOME/.config/Kvantum/$theme_name/$theme_name.kvconfig"
+            # Also copy the SVG file if it exists (required for most Kvantum themes)
+            if [[ -f "$theme_path/kvantum.svg" ]]; then
+                cp "$theme_path/kvantum.svg" "$HOME/.config/Kvantum/$theme_name/$theme_name.svg"
+            fi
+            if command -v kvantummanager &> /dev/null; then
+                kvantummanager --set "$theme_name" 2>/dev/null || true
+                log_detail "Applied Kvantum theme: $theme_name"
+            fi
+        fi
+
+        # Apply Gradience preset
+        if [[ -f "$theme_path/gradience.json" ]]; then
+            if command -v gradience-cli &> /dev/null; then
+                gradience-cli apply -p "$theme_path/gradience.json" --gtk both 2>/dev/null || true
+                log_detail "Applied Gradience preset: $theme_name"
+            fi
+        fi
+        
+        # Ensure GTK3 theme is set
+        gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark" 2>/dev/null || true
     fi
 
     # Always reload apps when switching themes

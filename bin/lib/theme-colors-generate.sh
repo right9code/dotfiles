@@ -194,6 +194,28 @@ generate_colors_from_wallpaper() {
     local yaru_theme=$(hue_to_yaru_theme "$hue")
     echo "$yaru_theme" > "$OUTPUT_DIR/icons.theme"
     echo "✓ Generated icons.theme: $yaru_theme (hue: ${hue}°)"
+    
+    # Process Kvantum template for Qt apps
+    if [ -f "$TEMPLATES_DIR/colors-kvantum.kvconfig" ]; then
+        process_template "$TEMPLATES_DIR/colors-kvantum.kvconfig" "$HOME/.config/Kvantum/pywal/pywal.kvconfig"
+        if command -v kvantummanager &> /dev/null; then
+            kvantummanager --set pywal 2>/dev/null || true
+            echo "✓ Applied Kvantum theme for Qt apps"
+        fi
+    fi
+    
+    # Process Gradience template for GTK4/libadwaita apps
+    if [ -f "$TEMPLATES_DIR/colors-gradience.json" ]; then
+        process_template "$TEMPLATES_DIR/colors-gradience.json" "$HOME/.config/presets/user/pywal-dynamic.json"
+        if command -v gradience-cli &> /dev/null; then
+            gradience-cli apply -p "$HOME/.config/presets/user/pywal-dynamic.json" --gtk both 2>/dev/null || true
+            echo "✓ Applied Gradience theme for GTK4/libadwaita apps"
+        fi
+    fi
+    
+    # Set GTK3 theme to adw-gtk3
+    gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark" 2>/dev/null || true
+    echo "✓ Set GTK3 theme to adw-gtk3-dark"
     echo
 
     echo "Running matugen..."
@@ -203,7 +225,7 @@ generate_colors_from_wallpaper() {
 
         echo "Generating icon theme for matugen..."
         local matugen_json=$(matugen image "$wallpaper" -m "dark" --dry-run -j hex 2>&1)
-        local accent_color=$(echo "$matugen_json" | jq -r '.colors.dark.primary')
+        local accent_color=$(echo "$matugen_json" | jq -r '.colors.primary.default')
         local hue=$(hex_to_hsl "$accent_color")
         local yaru_theme=$(hue_to_yaru_theme "$hue")
 
@@ -211,6 +233,24 @@ generate_colors_from_wallpaper() {
         mkdir -p "$matugen_output_dir"
         echo "$yaru_theme" > "$matugen_output_dir/icons.theme"
         echo "✓ Generated matugen icons.theme: $yaru_theme (hue: ${hue}°)"
+        
+        # Apply Kvantum theme for Qt apps
+        if command -v kvantummanager &> /dev/null; then
+            kvantummanager --set matugen 2>/dev/null || true
+            echo "✓ Applied Kvantum theme for Qt apps"
+        fi
+        
+        # Apply Gradience theme for GTK4/libadwaita apps
+        if command -v gradience-cli &> /dev/null; then
+            if [ -f "$HOME/.config/presets/user/matugen-dynamic.json" ]; then
+                gradience-cli apply -p "$HOME/.config/presets/user/matugen-dynamic.json" --gtk both 2>/dev/null || true
+                echo "✓ Applied Gradience theme for GTK4/libadwaita apps"
+            fi
+        fi
+        
+        # Set GTK3 theme to adw-gtk3
+        gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark" 2>/dev/null || true
+        echo "✓ Set GTK3 theme to adw-gtk3-dark"
     else
         echo "Warning: matugen not found, skipping"
     fi

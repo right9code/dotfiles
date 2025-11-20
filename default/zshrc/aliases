@@ -3,10 +3,28 @@ alias pf='fastfetch'
 alias ls='eza -lh --group-directories-first --icons=auto'
 alias ll='eza -al --group-directories-first --icons=always'
 alias lt='eza -a --tree --level=2 --icons=always'
+alias ld='eza -lD'
+alias lf='eza -lF --color=always | grep -v /'
+alias lh='eza -dl .* --group-directories-first'
 alias cd="zd"
 alias ff='sudo fd -HI -a --exclude .snapshots'
 alias is='fzf --preview="bat --style=numbers --color=always {}"'
 alias nis='nvim $(fzf --preview="bat --color=always {}")'
+
+# Yay Aliases
+alias i="yay -S"
+alias s="yay"
+alias r="yay -Rsu"
+
+# Git Aliases
+alias gc="git clone"
+
+# Hyprland Aliases
+alias hyprc="hyprctl clients"
+alias codehypr="code $HOME/.config/hypr/"
+
+# Misc
+alias cat='bat'
 
 # Directories
 alias ..='cd ..'

@@ -25,11 +25,24 @@ ripgrep
 zoxide
 pv
 bc
+nitch
+thefuck
 
 # Hyprland Ecosystem
 hyprland
 hyprland-qtutils
 hyprland-qt-support
+
+# Qt Theming
+kvantum
+kvantum-qt5
+qt5ct
+qt6ct
+
+# GTK4/libadwaita Theming
+gradience
+adw-gtk3-git
+
 hyprpaper
 hyprpicker
 hypridle
@@ -53,7 +66,7 @@ uwsm
 python-pywal16
 gjs
 waypaper
-matugen-bin
+matugen
 impala
 loupe
 

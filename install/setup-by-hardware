@@ -1,93 +1,153 @@
 #!/bin/bash
 
+# 'set -e' ensures that the script exits immediately if any command returns a non-zero exit status (error).
+# This is a safety feature to prevent the script from continuing execution in an unstable state.
 set -e
 
+# Determine the absolute path of the directory where this script is currently located.
+# 'cd --' ensures we handle directory names starting with '-' correctly.
+# 'dirname -- "${BASH_SOURCE[0]}"' gets the directory name of the current script.
+# '&>/dev/null' suppresses output during the cd command.
+# 'pwd' prints the working directory.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# Source (import) external helper scripts.
+# 'helpers.sh' contains utility functions like logging and UI elements.
 source "$SCRIPT_DIR/lib/helpers.sh"
+# 'backup.sh' contains functions to handle backing up existing files before overwriting.
 source "$SCRIPT_DIR/lib/backup.sh"
+
+# Define the root directory of the dotfiles repository.
 DOTFILES_DIR="$HOME/.local/share/dotfiles"
+
+# Define the path to the main Hyprland configuration file.
 HYPRLAND_CONF="$HOME/.config/hypr/hyprland.conf"
 
 log_info "Configuring hardware-specific settings..."
 
-# Determine which environment and keybindings to use
+# --- GPU Detection ---
+
+# Check if an NVIDIA GPU is present using the 'has_nvidia_gpu' helper function.
+# This function typically checks for 'nvidia' in lspci output.
 if has_nvidia_gpu; then
+  # If NVIDIA is found, use the NVIDIA-specific environment configuration.
+  # This likely sets env vars like LIBVA_DRIVER_NAME=nvidia, GBM_BACKEND=nvidia-drm, etc.
   ENV_CONF="nvidia-env.conf"
   log_detail "Detected NVIDIA GPU"
 else
+  # Otherwise, use the standard environment configuration.
   ENV_CONF="env.conf"
 fi
 
+# --- Hardware Type Detection (Laptop vs Desktop) ---
+
+# Detect if the machine is a laptop or desktop using the 'detect_hardware_type' helper.
+# This usually checks for the presence of a battery or lid switch.
 HARDWARE=$(detect_hardware_type)
+
 if [ "$HARDWARE" = "laptop" ]; then
-  spinner "Installing brightnessctl..." paru --noconfirm -S brightnessctl
+  # If it's a laptop:
+  # Install 'brightnessctl' to control screen brightness.
+  spinner "Installing brightnessctl..." yay --noconfirm -S brightnessctl
+  # Use laptop-specific keybindings (e.g., brightness keys, touchpad toggles).
   KEYBIND_CONF="laptop-keybindings.conf"
   log_detail "Detected laptop hardware"
 else
-  spinner "Installing ddcutil..." paru --noconfirm -S ddcutil
+  # If it's a desktop:
+  # Install 'ddcutil' to control external monitor brightness via DDC/CI.
+  spinner "Installing ddcutil..." yay --noconfirm -S ddcutil
+  # Use desktop-specific keybindings.
   KEYBIND_CONF="desktop-keybindings.conf"
   log_detail "Detected desktop hardware"
 fi
 
-# Remove any existing env/keybinding lines first
+# --- Hyprland Config Modification ---
+
+# We need to inject the correct 'source = ...' lines into hyprland.conf.
+# First, remove any existing lines that might be sourcing old env or keybinding configs.
+# 'sed -i' edits the file in-place.
+# '/pattern/d' deletes lines matching the pattern.
 sed -i '/source = .*\/\(nvidia-env\.conf\|env\.conf\)$/d' "$HYPRLAND_CONF"
 sed -i '/source = .*\/\(laptop-keybindings\.conf\|desktop-keybindings\.conf\)$/d' "$HYPRLAND_CONF"
 
-# Insert correct ones for current hardware
+# Now, insert the correct source lines.
+# We look for the line sourcing 'autostart.conf' and append our new lines after it.
+# '/pattern/a text' appends 'text' after the line matching 'pattern'.
+# We use double backslashes '\\n' to insert a newline character.
 sed -i "/source = .*autostart\\.conf/a source = ~/.local/share/dotfiles/default/hypr/conf/${ENV_CONF}\\nsource = ~/.local/share/dotfiles/default/hypr/conf/${KEYBIND_CONF}" "$HYPRLAND_CONF"
 
 log_success "Hardware-specific configuration applied"
 
-# Auto-configure monitors if Hyprland is running
+# --- Automatic Monitor Configuration ---
+
+# Check if Hyprland is currently running. We can only query monitors if it is.
 if command -v hyprctl &>/dev/null && hyprctl monitors &>/dev/null; then
   log_info "Detecting monitor configuration..."
 
+  # Define the path for the monitor configuration file.
   MONITORS_CONF="$HOME/.config/hypr/conf/monitors.conf"
+  # Create a temporary file to build the new config.
   TEMP_CONF=$(mktemp)
 
+  # Set a default environment variable for GDK scaling.
   echo "env = GDK_SCALE,1" > "$TEMP_CONF"
   echo "" >> "$TEMP_CONF"
 
-  # Parse hyprctl output and extract highest mode for each monitor
+  # Parse 'hyprctl monitors' output to find the best resolution/refresh rate for each monitor.
+  # This complex awk script does the following:
+  # 1. Identifies each monitor by name.
+  # 2. Scans its available modes.
+  # 3. Finds the mode with the highest refresh rate.
+  # 4. Generates a 'monitor=NAME,RESOLUTION@REFRESH,auto,1' line.
   hyprctl monitors | awk '
     /^Monitor / {
+      # Print the config for the PREVIOUS monitor (if any) before starting a new one.
       if (monitor) print "monitor=" monitor "," mode ",auto,1"
+      
+      # Start processing the new monitor.
       monitor = $2
-      gsub(/[()]/, "", monitor)
+      gsub(/[()]/, "", monitor) # Remove parentheses from monitor name.
       mode = ""
       max_refresh = 0
     }
     /availableModes:/ {
+      # Found the list of modes.
       in_modes = 1
       modes_line = $0
-      sub(/.*availableModes: /, "", modes_line)
+      sub(/.*availableModes: /, "", modes_line) # Strip the prefix.
 
+      # Split modes into an array.
       split(modes_line, modes, " ")
       for (i in modes) {
         if (modes[i] ~ /@/) {
+          # Parse resolution and refresh rate (e.g., 1920x1080@60Hz).
           split(modes[i], parts, "@")
           res = parts[1]
           refresh = parts[2]
-          sub(/Hz$/, "", refresh)
+          sub(/Hz$/, "", refresh) # Remove 'Hz' suffix.
 
+          # Check if this mode has a higher refresh rate than what we found so far.
           if (refresh + 0 > max_refresh) {
             max_refresh = refresh + 0
             mode = modes[i]
-            sub(/Hz$/, "", mode)
+            sub(/Hz$/, "", mode) # Clean up mode string.
           }
         }
       }
     }
     END {
+      # Print the config for the LAST monitor.
       if (monitor && mode) print "monitor=" monitor "," mode ",auto,1"
     }
   ' >> "$TEMP_CONF"
 
-  # Only update if we got valid output
+  # Check if the awk script actually generated any valid monitor lines.
   if grep -q "^monitor=" "$TEMP_CONF"; then
+    # If yes, overwrite the existing monitors.conf with our auto-generated one.
     mv "$TEMP_CONF" "$MONITORS_CONF"
     log_success "Auto-configured monitor"
   else
+    # If no, clean up the temp file and keep the default config.
     rm -f "$TEMP_CONF"
     log_detail "Could not detect monitor resolution, keeping default config"
   fi

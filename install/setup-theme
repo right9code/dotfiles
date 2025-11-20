@@ -1,41 +1,99 @@
 #!/bin/bash
 
+# 'set -e' ensures that the script exits immediately if any command returns a non-zero exit status (error).
+# This is a safety feature to prevent the script from continuing execution in an unstable state.
 set -e
 
+# Determine the absolute path of the directory where this script is currently located.
+# 'cd --' ensures we handle directory names starting with '-' correctly.
+# 'dirname -- "${BASH_SOURCE[0]}"' gets the directory name of the current script.
+# '&>/dev/null' suppresses output during the cd command.
+# 'pwd' prints the working directory.
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+# Source (import) external helper scripts.
+# 'helpers.sh' contains utility functions like logging and UI elements.
 source "$SCRIPT_DIR/lib/helpers.sh"
+
+# Define the root directory of the dotfiles repository.
 DOTFILES_DIR="$HOME/.local/share/dotfiles"
 
-# Set initial theme
+# --- Initial Theme Setup ---
+
 log_info "Setting up initial theme (everforest)..."
+
+# Create the 'current' directory if it doesn't exist.
+# This directory will hold symlinks to the currently active theme files.
 mkdir -p "$DOTFILES_DIR/current"
+
+# Define the path for the main theme symlink.
 THEME_LINK="$DOTFILES_DIR/current/theme"
+
+# Check if the theme link path exists and is a real directory (not a symlink).
+# This handles edge cases where a directory might have been manually created there.
 if [[ -d "$THEME_LINK" && ! -L "$THEME_LINK" ]]; then
-    # Remove directory if it exists and is not a symlink
     log_info "Removing existing theme directory at $THEME_LINK"
     rm -rf "$THEME_LINK"
 fi
+
+# Create the main theme symlink.
+# It points from '$DOTFILES_DIR/current/theme' -> '$DOTFILES_DIR/themes/everforest'.
+# By changing this one symlink later, we can instantly switch the entire system's theme.
 ln -snf "$DOTFILES_DIR/themes/everforest" "$THEME_LINK"
+
+# Create a symlink for the current wallpaper.
+# It points from '$DOTFILES_DIR/current/background' -> specific image in the theme folder.
 ln -snf "$DOTFILES_DIR/current/theme/backgrounds/1-everforest.jpg" "$DOTFILES_DIR/current/background"
 
+# --- Application Theme Linking ---
+
+# Ensure configuration directories exist for various applications.
 mkdir -p "$HOME/.config/nvim/lua/plugins"
 mkdir -p "$HOME/.config/btop/themes"
 mkdir -p "$HOME/.config/mako"
 
+# Link Neovim's theme configuration to the current theme's lua file.
+# This allows Neovim to pick up the colorscheme defined in the active theme.
 ln -snf "$DOTFILES_DIR/current/theme/neovim.lua" "$HOME/.config/nvim/lua/plugins/theme.lua"
+
+# Link Btop's theme file.
 ln -snf "$DOTFILES_DIR/current/theme/btop.theme" "$HOME/.config/btop/themes/current.theme"
+
+# Link Mako's (notification daemon) configuration file.
 ln -snf "$DOTFILES_DIR/current/theme/mako.ini" "$HOME/.config/mako/config"
 
+# --- Fastfetch Setup ---
+
+# Ensure Fastfetch config directory exists.
 mkdir -p "$HOME/.config/fastfetch"
+# Link the default Fastfetch config.
 ln -snf "$DOTFILES_DIR/config/fastfetch/configs/config-default.jsonc" "$HOME/.config/fastfetch/config.jsonc"
 
+# --- Dynamic Theme Templates Setup ---
+
+# Copy the default templates for Matugen and Pywal to the themes directory.
+# Matugen and Pywal are tools that generate color schemes from wallpapers.
+# These folders likely contain templates that these tools will fill in.
 cp -r "$DOTFILES_DIR/default/matugen" "$DOTFILES_DIR/themes/"
 cp -r "$DOTFILES_DIR/default/pywal" "$DOTFILES_DIR/themes/"
+
+# Link the backgrounds directory into the Matugen and Pywal theme folders.
+# This gives these tools access to the wallpapers so they can generate colors from them.
 ln -snf "$DOTFILES_DIR/themes/backgrounds" "$DOTFILES_DIR/themes/matugen"
 ln -snf "$DOTFILES_DIR/themes/backgrounds" "$DOTFILES_DIR/themes/pywal"
 
+# --- GNOME/GTK Settings ---
+
+# Apply GNOME interface settings using 'gsettings'.
+# These settings affect GTK applications (like Nautilus, Settings, etc.).
+
+# Set the icon theme to 'Yaru-sage' (matches Everforest well).
 gsettings set org.gnome.desktop.interface icon-theme "Yaru-sage"
+
+# Set the interface font.
 gsettings set org.gnome.desktop.interface font-name 'CaskaydiaMono Nerd Font Mono 11'
+
+# Set the monospace font (used in terminals and code editors).
 gsettings set org.gnome.desktop.interface monospace-font-name 'CaskaydiaMono Nerd Font Mono 11'
 
 log_success "Initial theme set (everforest)"

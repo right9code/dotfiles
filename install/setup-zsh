@@ -1,18 +1,41 @@
 #!/bin/bash
 
+# 'set -e' ensures that the script exits immediately if any command returns a non-zero exit status (error).
+# This is a safety feature to prevent the script from continuing execution in an unstable state.
 set -e
 
+# Determine the absolute path of the directory where this script is currently located.
+# 'cd --' ensures we handle directory names starting with '-' correctly.
+# 'dirname -- "${BASH_SOURCE[0]}"' gets the directory name of the current script.
+# '&>/dev/null' suppresses output during the cd command.
+# 'pwd' prints the working directory.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# Source (import) external helper scripts.
+# 'helpers.sh' contains utility functions like logging and UI elements.
 source "$SCRIPT_DIR/lib/helpers.sh"
+# 'backup.sh' contains functions to handle backing up existing files before overwriting.
 source "$SCRIPT_DIR/lib/backup.sh"
+
+# Define the root directory of the dotfiles repository.
 DOTFILES_DIR="$HOME/.local/share/dotfiles"
 
-# Setup zsh
+# --- Zsh Shell Setup ---
+
 log_info "Setting zsh as default shell..."
+
+# Define the path to the Zsh executable.
 ZSH_PATH=/usr/bin/zsh
+
+# Get the current user's default shell from the /etc/passwd file.
+# 'getent passwd $USER' retrieves the user's entry.
+# 'cut -d: -f7' extracts the 7th field, which is the login shell.
 CURRENT_SHELL=$(getent passwd $USER | cut -d: -f7)
 
+# Check if the current shell is already Zsh.
 if [ "$CURRENT_SHELL" != "$ZSH_PATH" ]; then
+    # If not, use 'chsh' (change shell) to set Zsh as the default.
+    # 'sudo' is required because this modifies /etc/passwd.
     sudo chsh -s "$ZSH_PATH" "$USER"
     log_success "Default shell changed to zsh"
     log_info "Note: You need to log out and back in for shell change to take effect"
@@ -20,19 +43,32 @@ else
     log_detail "zsh is already the default shell"
 fi
 
-# Install Oh My Zsh
+# --- Oh My Zsh Installation ---
+
+# Check if the Oh My Zsh directory exists in the home directory.
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
     log_info "Installing Oh My Zsh..."
+    
+    # Download and run the official Oh My Zsh installation script.
+    # 'curl -fsSL' fetches the script silently (-s), following redirects (-L), and failing on error (-f).
+    # 'sh -c ... --unattended' runs the installer without asking for confirmation or trying to change the shell (since we did that).
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    
     log_success "Oh My Zsh installed"
 else
     log_detail "Oh My Zsh already installed"
 fi
 
-# Install zsh plugins
+# --- Zsh Plugins Installation ---
+
 log_info "Installing zsh plugins..."
+
+# Define the custom directory for Oh My Zsh.
+# If ZSH_CUSTOM is not set, default to ~/.oh-my-zsh/custom.
 ZSH_CUSTOM="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
 
+# Install 'zsh-autosuggestions' plugin.
+# This plugin suggests commands as you type based on your history.
 if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
     git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
     log_success "zsh-autosuggestions installed"
@@ -40,6 +76,8 @@ else
     log_detail "zsh-autosuggestions already installed"
 fi
 
+# Install 'fast-syntax-highlighting' plugin.
+# This plugin provides syntax highlighting for commands in the terminal.
 if [ ! -d "$ZSH_CUSTOM/plugins/fast-syntax-highlighting" ]; then
     git clone https://github.com/zdharma-continuum/fast-syntax-highlighting.git \
       "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
@@ -48,16 +86,58 @@ else
     log_detail "fast-syntax-highlighting already installed"
 fi
 
+# Install 'zsh-completions' plugin.
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-completions" ]; then
+    git clone https://github.com/zsh-users/zsh-completions "$ZSH_CUSTOM/plugins/zsh-completions"
+    log_success "zsh-completions installed"
+else
+    log_detail "zsh-completions already installed"
+fi
+
+# Install 'zsh-history-substring-search' plugin.
+if [ ! -d "$ZSH_CUSTOM/plugins/zsh-history-substring-search" ]; then
+    git clone https://github.com/zsh-users/zsh-history-substring-search "$ZSH_CUSTOM/plugins/zsh-history-substring-search"
+    log_success "zsh-history-substring-search installed"
+else
+    log_detail "zsh-history-substring-search already installed"
+fi
+
+# Install 'fzf-tab' plugin.
+if [ ! -d "$ZSH_CUSTOM/plugins/fzf-tab" ]; then
+    git clone https://github.com/Aloxaf/fzf-tab "$ZSH_CUSTOM/plugins/fzf-tab"
+    log_success "fzf-tab installed"
+else
+    log_detail "fzf-tab already installed"
+fi
+
+# Install 'auto-notify' plugin.
+if [ ! -d "$ZSH_CUSTOM/plugins/auto-notify" ]; then
+    git clone https://github.com/MichaelAquilina/zsh-auto-notify "$ZSH_CUSTOM/plugins/auto-notify"
+    log_success "auto-notify installed"
+else
+    log_detail "auto-notify already installed"
+fi
+
+# --- .zshrc Configuration ---
+
 log_info "Setting up .zshrc..."
+
+# Check if a .zshrc file or symlink already exists in the home directory.
 if [ -f "$HOME/.zshrc" ] || [ -L "$HOME/.zshrc" ]; then
+    # If it exists (and is not just a broken link), back it up.
     if [ -e "$HOME/.zshrc" ]; then
         backup_file "$HOME/.zshrc" || {
             log_error "Failed to backup .zshrc"
             exit 1
         }
     fi
+    # Remove the existing file/link to make room for the new one.
     remove_path "$HOME/.zshrc"
 fi
+
+# Copy the custom .zshrc from the dotfiles repository to the home directory.
+# We use 'cp' instead of 'ln -s' (symlink) here, likely to allow local modifications without affecting the repo,
+# or because the repo structure might change. (Note: Symlinking is often preferred for dotfiles, but this script copies).
 cp "$DOTFILES_DIR/default/.zshrc" "$HOME/.zshrc"
 
 log_success "Zsh setup finished"

@@ -1,0 +1,71 @@
+#!/bin/bash
+
+# 'set -e' ensures that the script exits immediately if any command returns a non-zero exit status (error).
+# This is a safety feature to prevent the script from continuing execution in an unstable state.
+set -e
+
+# Determine the absolute path of the directory where this script is currently located.
+# 'cd --' ensures we handle directory names starting with '-' correctly.
+# 'dirname -- "${BASH_SOURCE[0]}"' gets the directory name of the current script.
+# '&>/dev/null' suppresses output during the cd command.
+# 'pwd' prints the working directory.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
+# Source (import) external helper scripts.
+# 'helpers.sh' contains utility functions like logging and UI elements.
+source "$SCRIPT_DIR/lib/helpers.sh"
+
+log_info "Setting up Qt theming with Kvantum..."
+
+# --- Kvantum Setup ---
+# Kvantum is a SVG-based theme engine for Qt applications.
+# It allows Qt apps to look like GTK apps or have custom styles.
+
+# Create Kvantum configuration directories for our dynamic theme engines.
+# These directories will hold the generated theme files when using Matugen or Pywal.
+mkdir -p "$HOME/.config/Kvantum/matugen"
+mkdir -p "$HOME/.config/Kvantum/pywal"
+
+# Create Kvantum config directories for each static theme.
+DOTFILES_DIR="$HOME/.local/share/dotfiles"
+
+# Loop through all directories in the themes folder.
+for theme_dir in "$DOTFILES_DIR/themes"/*; do
+    # Check if it is a directory and not the 'backgrounds' folder.
+    if [ -d "$theme_dir" ] && [ "$(basename "$theme_dir")" != "backgrounds" ]; then
+        theme_name=$(basename "$theme_dir")
+        
+        # Create a directory in ~/.config/Kvantum matching the theme name.
+        # This is required because Kvantum expects a folder named 'ThemeName' containing 'ThemeName.kvconfig'.
+        # The 'theme-set' script will later copy the .kvconfig file into this folder when switching themes.
+        mkdir -p "$HOME/.config/Kvantum/$theme_name"
+    fi
+done
+
+# --- Qt Configuration Tools ---
+
+# Configure qt5ct (Qt5 Configuration Tool) if installed.
+# This tool allows you to select the theme engine (like Kvantum) for Qt5 apps.
+if command -v qt5ct &> /dev/null; then
+    mkdir -p "$HOME/.config/qt5ct"
+    log_detail "Qt5ct directory created"
+fi
+
+# Configure qt6ct (Qt6 Configuration Tool) if installed.
+# Same as above, but for newer Qt6 applications.
+if command -v qt6ct &> /dev/null; then
+    mkdir -p "$HOME/.config/qt6ct"
+    log_detail "Qt6ct directory created"
+fi
+
+log_success "Qt theming setup complete"
+
+# --- Install Kvantum Themes ---
+
+log_info "Installing Kvantum themes for static themes..."
+if [ -f "$SCRIPT_DIR/install-kvantum-themes.sh" ]; then
+    bash "$SCRIPT_DIR/install-kvantum-themes.sh"
+else
+    log_detail "Kvantum theme installer not found, skipping..."
+fi
+

@@ -35,3 +35,11 @@ output_path = '~/.local/share/dotfiles/themes/matugen/gtk.css'
 [templates.walker]
 input_path = '~/.config/matugen/templates/walker.css'
 output_path = '~/.local/share/dotfiles/themes/matugen/walker.css'
+
+[templates.kvantum]
+input_path = "~/.config/matugen/templates/kvantum.kvconfig"
+output_path = "~/.config/Kvantum/matugen/matugen.kvconfig"
+
+[templates.gradience]
+input_path = "~/.config/matugen/templates/gradience.json"
+output_path = "~/.config/presets/user/matugen-dynamic.json"

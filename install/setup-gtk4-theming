@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# 'set -e' ensures that the script exits immediately if any command returns a non-zero exit status (error).
+# This is a safety feature to prevent the script from continuing execution in an unstable state.
+set -e
+
+# Determine the absolute path of the directory where this script is currently located.
+# 'cd --' ensures we handle directory names starting with '-' correctly.
+# 'dirname -- "${BASH_SOURCE[0]}"' gets the directory name of the current script.
+# '&>/dev/null' suppresses output during the cd command.
+# 'pwd' prints the working directory.
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
+# Source (import) external helper scripts.
+# 'helpers.sh' contains utility functions like logging and UI elements.
+source "$SCRIPT_DIR/lib/helpers.sh"
+
+log_info "Setting up GTK4/libadwaita theming..."
+
+# --- Gradience Setup ---
+# Gradience is a tool that allows customization of GTK4 and libadwaita applications.
+# It generates color schemes that override the default Adwaita theme.
+
+# Create the directory where Gradience stores user-created presets.
+# This is where dynamic themes (like Matugen and Pywal) will save their generated presets.
+mkdir -p "$HOME/.config/presets/user"
+
+# --- GTK3 Compatibility ---
+# GTK3 apps don't use libadwaita, so we need to set a separate theme for them.
+# 'adw-gtk3-dark' is a GTK3 theme that mimics the libadwaita look.
+
+# Check if 'gsettings' is available (it's part of GNOME/GTK).
+if command -v gsettings &> /dev/null; then
+    # Set the GTK3 theme to 'adw-gtk3-dark'.
+    # '2>/dev/null || true' suppresses errors and prevents script failure if gsettings fails.
+    gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark" 2>/dev/null || true
+    log_detail "Set GTK3 theme to adw-gtk3-dark"
+fi
+
+# --- GTK Configuration Directories ---
+
+# Create GTK3 configuration directory.
+# This is where gtk.css (created by setup-config) will be placed.
+mkdir -p "$HOME/.config/gtk-3.0"
+
+# Create GTK4 configuration directory.
+# This is where gtk.css for GTK4 apps will be placed.
+mkdir -p "$HOME/.config/gtk-4.0"
+
+log_success "GTK4/libadwaita theming setup complete"

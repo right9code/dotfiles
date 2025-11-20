@@ -1,37 +1,74 @@
 #!/bin/bash
+
+# 'set -e' ensures that the script exits immediately if any command returns a non-zero exit status (error).
+# This is a safety feature to prevent the script from continuing execution in an unstable state.
 set -e
 
+# Determine the absolute path of the directory where this script is currently located.
+# 'cd --' ensures we handle directory names starting with '-' correctly.
+# 'dirname -- "${BASH_SOURCE[0]}"' gets the directory name of the current script.
+# '&>/dev/null' suppresses output during the cd command.
+# 'pwd' prints the working directory.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# Source (import) external helper scripts.
+# 'helpers.sh' contains utility functions like logging and UI elements.
 source "$SCRIPT_DIR/lib/helpers.sh"
+# 'backup.sh' contains functions to handle backing up existing files before overwriting.
 source "$SCRIPT_DIR/lib/backup.sh"
+
+# Define the root directory of the dotfiles repository.
 DOTFILES_DIR="$HOME/.local/share/dotfiles"
 
+# --- Backup Existing Neovim Config ---
+
+# Check if a Neovim configuration directory or symlink already exists.
 if [ -d "$HOME/.config/nvim" ] || [ -L "$HOME/.config/nvim" ]; then
   log_info "Existing nvim config found, backing up..."
+  
+  # If it exists (and isn't just a broken link), back it up.
   if [ -e "$HOME/.config/nvim" ]; then
     backup_file "$HOME/.config/nvim" || {
       log_error "Failed to backup nvim config"
       exit 1
     }
   fi
+  
+  # Remove the existing configuration to make room for the new one.
   remove_path "$HOME/.config/nvim"
 fi
 
+# --- Install LazyVim ---
+
+# Clone the official LazyVim starter repository to ~/.config/nvim.
+# This provides the base structure and default configuration for LazyVim.
 if ! git clone https://github.com/LazyVim/starter ~/.config/nvim; then
   log_error "Failed to clone LazyVim starter"
   exit 1
 fi
+
+# Remove the .git directory from the cloned repo.
+# We do this because we want to treat this as our own configuration, not a clone of the starter repo.
+# This allows us to initialize our own git repo later if we want, or just manage it via dotfiles.
 rm -rf ~/.config/nvim/.git
 log_info "LazyVim starter cloned"
 
+# --- Apply Custom Configuration ---
+
+# Check if our custom Neovim settings exist in the dotfiles repo.
 if [ -d "$DOTFILES_DIR/default/nvim" ]; then
+  # Copy our custom files over the LazyVim starter files.
+  # This overwrites default settings with our preferences (plugins, keymaps, etc.).
   cp -r "$DOTFILES_DIR/default/nvim"/* "$HOME/.config/nvim/"
 else
   log_error "Could not setup lazyvim"
   exit 1
 fi
 
-# Append custom options to options.lua
+# --- Post-Install Tweaks ---
+
+# Append custom options directly to the options.lua file.
+# This ensures specific settings (like line numbers) are forced even if not in our copied config.
 cat >> "$HOME/.config/nvim/lua/config/options.lua" <<'EOF'
 
 local opt = vim.opt
